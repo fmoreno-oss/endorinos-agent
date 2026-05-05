@@ -1,11 +1,13 @@
-name: Redeploy Bot (Send Intro)
+name: Redeploy Bot
 
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-  jobs:
-    redeploy:
-        runs-on: ubuntu-latest
-            steps:
-                  - name: Trigger Railway redeploy via empty commit
-                          run: echo "Triggering redeploy to send intro message"
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Triggered
+        run: echo done
