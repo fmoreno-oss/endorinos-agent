@@ -81,7 +81,7 @@ async function main() {
         }, 6000);
       }
 
-      startCronJobs(sock);
+      startCronJobs();
     }
   });
 
