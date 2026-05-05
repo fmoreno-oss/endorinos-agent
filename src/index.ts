@@ -37,47 +37,25 @@ async function main() {
 
   await connectWhatsApp();
 
-  // Send intro message to endorinos after connecting
+  // Presentación en el grupo endorinos al arrancar
   setTimeout(async () => {
     try {
       await sendTextMessage(
         env.WHATSAPP_GROUP_JID,
-        'Qué onda equipo. Soy Benito, su agente de IA. Aquí para apoyarles cuando me necesiten: mencionen mi nombre o escríbanme directamente.'
+        'Hola equipo. Soy Benito, el asistente virtual de Ēndor. Opero desde la nube y estoy aquí para apoyarles en lo que necesiten. Menciónenme o escríbanme directamente cuando quieran.'
       );
     } catch (err) {
       logger.error('Failed to send intro message', err);
     }
   }, 5000);
 
-  // One-time NY vibe message
-  setTimeout(async () => {
-    try {
-      await sendTextMessage(
-        env.WHATSAPP_GROUP_JID,
-        'La ciudad nunca duerme, y nosotros tampoco... pero aquí estamos, pa los que sí duermen en el grupo 🌃'
-      );
-    } catch (err) {
-      logger.error('Failed to send vibe message', err);
-    }
-  }, 8000);
-
-  // One-time motivational message
-  setTimeout(async () => {
-    try {
-      const motivacion = await generateGreeting();
-      await sendTextMessage(env.WHATSAPP_GROUP_JID, motivacion);
-    } catch (err) {
-      logger.error('Failed to send motivational message', err);
-    }
-  }, 12000);
-
-  // Send intro message to warroom if configured
+  // Presentación en warroom si está configurado
   if (env.WHATSAPP_WARROOM_JID) {
     setTimeout(async () => {
       try {
         await sendTextMessage(
           env.WHATSAPP_WARROOM_JID!,
-          'Reportándome. Soy Benito, ya estoy aquí en el warroom. Mencíonenme cuando me necesiten.'
+          'Reportándome en el warroom. Soy Benito. Menciónenme cuando me necesiten.'
         );
       } catch (err) {
         logger.error('Failed to send warroom intro message', err);
@@ -132,11 +110,10 @@ async function main() {
         // Respond when mentioned (@Benito or "benito" in text)
         const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
         const botNumber = getSocket().user?.id?.split(':')[0] || '';
-        const isMentionedByJid = mentionedJids.length > 0; // Any mention in group = likely the bot
+        const isMentionedByJid = mentionedJids.length > 0;
         const isMentionedByName = content.toLowerCase().includes('benito');
 
         if (isMentionedByJid || isMentionedByName) {
-          // Clean: remove @numbers and "benito" to get the actual message
           const cleanMessage = content.replace(/@\S+/g, '').replace(/benito/gi, '').trim();
           logger.info(`Mention detected! Responding to: "${cleanMessage || 'hola'}"`);
           await handleMention(senderName, cleanMessage || 'hola', jid);
