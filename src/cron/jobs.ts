@@ -1,6 +1,6 @@
 import { schedule, type ScheduledTask } from 'node-cron';
 import { env } from '../config/env.js';
-import { GREETING_CRON, KICKOFF_CRON, NUDGE_CRON, INACTIVE_DAYS_THRESHOLD } from '../config/constants.js';
+import { GREETING_CRON, KICKOFF_REMINDER_CRON, KICKOFF_CRON, NUDGE_CRON, INACTIVE_DAYS_THRESHOLD, ZOOM_KICKOFF_URL } from '../config/constants.js';
 import { generateGreeting, generateKickoffReminder, generateNudge } from '../services/claude.js';
 import { getInactiveMembers } from '../services/members.js';
 import { sendTextMessage, sendMentionMessage } from '../whatsapp/sender.js';
@@ -25,6 +25,22 @@ export function startCronJobs(): void {
       } catch (error) {
         logger.error('Daily greeting failed:', error);
         await logBotAction('greeting', { error: String(error) }, false, String(error));
+      }
+    }, { timezone: tz }),
+  );
+
+  // Kickoff pre-reminder on Mondays at 8:45am (30 min before kickoff)
+  tasks.push(
+    schedule(KICKOFF_REMINDER_CRON, async () => {
+      try {
+        logger.info('Running kickoff pre-reminder job...');
+        const msg = `En 30 minutos arranca el kickoff semanal (9:15). ¿Listos?\n\n${ZOOM_KICKOFF_URL}`;
+        await sendTextMessage(groupJid, msg);
+        await logBotAction('kickoff_reminder', { text: msg }, true);
+        logger.info('Kickoff pre-reminder sent successfully');
+      } catch (error) {
+        logger.error('Kickoff pre-reminder failed:', error);
+        await logBotAction('kickoff_reminder', { error: String(error) }, false, String(error));
       }
     }, { timezone: tz }),
   );
@@ -74,9 +90,10 @@ export function startCronJobs(): void {
   );
 
   logger.info(`Cron jobs started (timezone: ${tz})`);
-  logger.info(`  Greeting: ${GREETING_CRON}`);
-  logger.info(`  Kickoff:  ${KICKOFF_CRON}`);
-  logger.info(`  Nudge:    ${NUDGE_CRON}`);
+  logger.info(`  Greeting:         ${GREETING_CRON}`);
+  logger.info(`  Kickoff reminder: ${KICKOFF_REMINDER_CRON}`);
+  logger.info(`  Kickoff:          ${KICKOFF_CRON}`);
+  logger.info(`  Nudge:            ${NUDGE_CRON}`);
 }
 
 export function stopCronJobs(): void {
