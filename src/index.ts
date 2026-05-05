@@ -5,9 +5,10 @@ import { upsertMember, updateActivity } from './services/members.js';
 import { saveMessage } from './services/messages.js';
 import { handleCommand } from './commands/index.js';
 import { handleMention } from './services/mention.js';
+import { generateGreeting } from './services/claude.js';
 import { startCronJobs } from './cron/jobs.js';
 import { COMMAND_PREFIX } from './config/constants.js';
-import { sendTextMessage } from './whatsapp/sender.js';
+import { sendTextMessage, sendVoiceNote } from './whatsapp/sender.js';
 import type { proto } from 'baileys';
 
 function getTextContent(msg: proto.IWebMessageInfo): string | null {
@@ -38,7 +39,7 @@ async function main() {
                 try {
                                 await sendTextMessage(
                                                     env.WHATSAPP_GROUP_JID,
-                                                    'QuÃ© onda equipo. Soy Benito, su agente de IA. AquÃ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃ­banme directamente. Con gusto.'
+                                                    'QuÃÂ© onda equipo. Soy Benito, su agente de IA. AquÃÂ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃÂ­banme directamente. Con gusto.'
                                                 );
                 } catch (err) {
                                 logger.error('Failed to send intro message', err);
@@ -50,12 +51,22 @@ async function main() {
     try {
       await sendTextMessage(
         env.WHATSAPP_GROUP_JID,
-        'La ciudad nunca duerme, y nosotros tampoco... pero aquí estamos, pa los que sí duermen en el grupo 👀'
+        'La ciudad nunca duerme, y nosotros tampoco... pero aquÃ­ estamos, pa los que sÃ­ duermen en el grupo ð'
       );
     } catch (err) {
       logger.error('Failed to send vibe message', err);
     }
   }, 8000);
+
+  // One-time motivational voice note
+  setTimeout(async () => {
+    try {
+      const motivacion = await generateGreeting();
+      await sendVoiceNote(env.WHATSAPP_GROUP_JID, motivacion);
+    } catch (err) {
+      logger.error('Failed to send motivational voice note', err);
+    }
+  }, 12000);
 
     onMessage(async ({ messages: msgs }) => {
                 for (const raw of msgs) {
