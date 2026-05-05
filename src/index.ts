@@ -73,7 +73,7 @@ async function main() {
           try {
             await sendTextMessage(
               env.WHATSAPP_WARROOM_JID!,
-              'Hola. Soy Benito, el asistente de \u00c9ndor. De vuelta en el grupo. Listo para apoyar.',
+              'Soy Benito, el asistente de \u00c9ndor. Puedo resumir la conversaci\u00f3n del grupo, dar avisos al equipo o resolver dudas espec\u00edficas. Esc\u00edbeme directamente.',
             );
             logger.info('Presentacion enviada al warroom');
           } catch (err) {
