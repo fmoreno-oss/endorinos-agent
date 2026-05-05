@@ -7,6 +7,7 @@ const envSchema = z.object({
   ELEVENLABS_API_KEY: z.string().min(1, 'ELEVENLABS_API_KEY is required'),
   ELEVENLABS_VOICE_ID: z.string().min(1, 'ELEVENLABS_VOICE_ID is required'),
   WHATSAPP_GROUP_JID: z.string().min(1, 'WHATSAPP_GROUP_JID is required'),
+  WHATSAPP_WARROOM_JID: z.string().optional(),
   TZ: z.string().default('America/Mexico_City'),
   NODE_ENV: z.enum(['development', 'production']).default('development'),
 });
