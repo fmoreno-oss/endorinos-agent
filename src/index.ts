@@ -38,12 +38,24 @@ async function main() {
                 try {
                                 await sendTextMessage(
                                                     env.WHATSAPP_GROUP_JID,
-                                                    'Qué onda equipo. Soy Benito, su agente de IA. Aquí para apoyarles cuando me necesiten: mencionen mi nombre o escríbanme directamente. Con gusto.'
+                                                    'QuÃ© onda equipo. Soy Benito, su agente de IA. AquÃ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃ­banme directamente. Con gusto.'
                                                 );
                 } catch (err) {
                                 logger.error('Failed to send intro message', err);
                 }
     }, 5000);
+
+  // One-time NY vibe message
+  setTimeout(async () => {
+    try {
+      await sendTextMessage(
+        env.WHATSAPP_GROUP_JID,
+        'La ciudad nunca duerme, y nosotros tampoco... pero aquí estamos, pa los que sí duermen en el grupo 👀'
+      );
+    } catch (err) {
+      logger.error('Failed to send vibe message', err);
+    }
+  }, 8000);
 
     onMessage(async ({ messages: msgs }) => {
                 for (const raw of msgs) {
