@@ -12,125 +12,146 @@ import { sendTextMessage } from './whatsapp/sender.js';
 import type { proto } from 'baileys';
 
 function getTextContent(msg: proto.IWebMessageInfo): string | null {
-        const m = msg.message;
-        if (!m) return null;
-        return m.conversation || m.extendedTextMessage?.text || null;
+  const m = msg.message;
+  if (!m) return null;
+  return m.conversation || m.extendedTextMessage?.text || null;
 }
 
 function getMessageType(msg: proto.IWebMessageInfo): string {
-        const m = msg.message;
-        if (!m) return 'unknown';
-        if (m.conversation || m.extendedTextMessage) return 'text';
-        if (m.imageMessage) return 'image';
-        if (m.videoMessage) return 'video';
-        if (m.audioMessage) return 'audio';
-        if (m.stickerMessage) return 'sticker';
-        return 'other';
+  const m = msg.message;
+  if (!m) return 'unknown';
+  if (m.conversation || m.extendedTextMessage) return 'text';
+  if (m.imageMessage) return 'image';
+  if (m.videoMessage) return 'video';
+  if (m.audioMessage) return 'audio';
+  if (m.stickerMessage) return 'sticker';
+  return 'other';
 }
 
 async function main() {
-        logger.info(`Endorinos Agent starting...`);
-        logger.info(`Group: ${env.WHATSAPP_GROUP_JID}`);
+  logger.info(`Endorinos Agent starting...`);
+  logger.info(`Group: ${env.WHATSAPP_GROUP_JID}`);
+  if (env.WHATSAPP_WARROOM_JID) {
+    logger.info(`Warroom: ${env.WHATSAPP_WARROOM_JID}`);
+  }
 
-    await connectWhatsApp();
+  await connectWhatsApp();
 
-    // Send intro message after connecting
-    setTimeout(async () => {
-                try {
-                                await sendTextMessage(
-                                                    env.WHATSAPP_GROUP_JID,
-                                                    'QuÃÂÃÂ© onda equipo. Soy Benito, su agente de IA. AquÃÂÃÂ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃÂÃÂ­banme directamente. Con gusto.'
-                                                );
-                } catch (err) {
-                                logger.error('Failed to send intro message', err);
-                }
-    }, 5000);
+  // Send intro message to endorinos after connecting
+  setTimeout(async () => {
+    try {
+      await sendTextMessage(
+        env.WHATSAPP_GROUP_JID,
+        'Qué onda equipo. Soy Benito, su agente de IA. Aquí para apoyarles cuando me necesiten: mencionen mi nombre o escríbanme directamente.'
+      );
+    } catch (err) {
+      logger.error('Failed to send intro message', err);
+    }
+  }, 5000);
 
   // One-time NY vibe message
   setTimeout(async () => {
     try {
       await sendTextMessage(
         env.WHATSAPP_GROUP_JID,
-        'La ciudad nunca duerme, y nosotros tampoco... pero aquÃÂ­ estamos, pa los que sÃÂ­ duermen en el grupo Ã°ÂÂÂ'
+        'La ciudad nunca duerme, y nosotros tampoco... pero aquí estamos, pa los que sí duermen en el grupo 🌃'
       );
     } catch (err) {
       logger.error('Failed to send vibe message', err);
     }
   }, 8000);
 
-  // One-time motivational voice note
+  // One-time motivational message
   setTimeout(async () => {
     try {
       const motivacion = await generateGreeting();
       await sendTextMessage(env.WHATSAPP_GROUP_JID, motivacion);
     } catch (err) {
-      logger.error('Failed to send motivational voice note', err);
+      logger.error('Failed to send motivational message', err);
     }
   }, 12000);
 
-    onMessage(async ({ messages: msgs }) => {
-                for (const raw of msgs) {
-                                try {
-                                                    const msg = raw as proto.IWebMessageInfo;
-                                                    if (!msg.key || !msg.message) continue;
+  // Send intro message to warroom if configured
+  if (env.WHATSAPP_WARROOM_JID) {
+    setTimeout(async () => {
+      try {
+        await sendTextMessage(
+          env.WHATSAPP_WARROOM_JID!,
+          'Reportándome. Soy Benito, ya estoy aquí en el warroom. Menciónenme cuando me necesiten.'
+        );
+      } catch (err) {
+        logger.error('Failed to send warroom intro message', err);
+      }
+    }, 6000);
+  }
 
-                                    const jid = msg.key.remoteJid;
-                                                    if (!jid) continue;
+  onMessage(async ({ messages: msgs }) => {
+    for (const raw of msgs) {
+      try {
+        const msg = raw as proto.IWebMessageInfo;
+        if (!msg.key || !msg.message) continue;
 
-                                    if (jid !== env.WHATSAPP_GROUP_JID) continue;
-                                                    if (msg.key.fromMe) continue;
+        const jid = msg.key.remoteJid;
+        if (!jid) continue;
 
-                                    const senderJid = msg.key.participant || '';
-                                                    if (!senderJid) continue;
+        // Accept messages from endorinos group or warroom group
+        const allowedGroups = [env.WHATSAPP_GROUP_JID];
+        if (env.WHATSAPP_WARROOM_JID) allowedGroups.push(env.WHATSAPP_WARROOM_JID);
+        if (!allowedGroups.includes(jid)) continue;
 
-                                    const senderName = msg.pushName || 'Desconocido';
-                                                    const content = getTextContent(msg);
-                                                    const type = getMessageType(msg);
+        if (msg.key.fromMe) continue;
 
-                                    logger.info(`[${senderName}]: "${content || `<${type}>`}"`);
+        const senderJid = msg.key.participant || '';
+        if (!senderJid) continue;
 
-                                    // Save to database
-                                    const memberId = await upsertMember(senderJid, senderName);
-                                                    await updateActivity(senderJid);
-                                                    await saveMessage({
-                                                                            memberId,
-                                                                            whatsappMessageId: msg.key.id || '',
-                                                                            content,
-                                                                            messageType: type,
-                                                                            sentAt: new Date((msg.messageTimestamp as number) * 1000),
-                                                    });
+        const senderName = msg.pushName || 'Desconocido';
+        const content = getTextContent(msg);
+        const type = getMessageType(msg);
 
-                                    if (!content) continue;
+        logger.info(`[${senderName}] (${jid === env.WHATSAPP_WARROOM_JID ? 'warroom' : 'endorinos'}): "${content || `<${type}>`}"`);
 
-                                    // Commands: !resumen, !actividad
-                                    if (content.startsWith(COMMAND_PREFIX)) {
-                                                            await handleCommand(content, jid);
-                                                            continue;
-                                    }
+        // Save to database
+        const memberId = await upsertMember(senderJid, senderName);
+        await updateActivity(senderJid);
+        await saveMessage({
+          memberId,
+          whatsappMessageId: msg.key.id || '',
+          content,
+          messageType: type,
+          sentAt: new Date((msg.messageTimestamp as number) * 1000),
+        });
 
-                                    // Respond when mentioned (@Benito or "benito" in text)
-                                    const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-                                                    const botNumber = getSocket().user?.id?.split(':')[0] || '';
-                                                    const isMentionedByJid = mentionedJids.length > 0; // Any mention in group = likely the bot
-                                    const isMentionedByName = content.toLowerCase().includes('benito');
+        if (!content) continue;
 
-                                    if (isMentionedByJid || isMentionedByName) {
-                                                            // Clean: remove @numbers and "benito" to get the actual message
-                                                        const cleanMessage = content.replace(/@\S+/g, '').replace(/benito/gi, '').trim();
-                                                            logger.info(`Mention detected! Responding to: "${cleanMessage || 'hola'}"`);
-                                                            await handleMention(senderName, cleanMessage || 'hola', jid);
-                                    }
-                                } catch (error) {
-                                                    logger.error('Error processing message:', error);
-                                }
-                }
-    });
+        // Commands: !resumen, !actividad
+        if (content.startsWith(COMMAND_PREFIX)) {
+          await handleCommand(content, jid);
+          continue;
+        }
 
-    startCronJobs();
-        logger.info('Bot running. Listening for messages...');
+        // Respond when mentioned (@Benito or "benito" in text)
+        const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+        const botNumber = getSocket().user?.id?.split(':')[0] || '';
+        const isMentionedByJid = mentionedJids.length > 0; // Any mention in group = likely the bot
+        const isMentionedByName = content.toLowerCase().includes('benito');
+
+        if (isMentionedByJid || isMentionedByName) {
+          // Clean: remove @numbers and "benito" to get the actual message
+          const cleanMessage = content.replace(/@\S+/g, '').replace(/benito/gi, '').trim();
+          logger.info(`Mention detected! Responding to: "${cleanMessage || 'hola'}"`);
+          await handleMention(senderName, cleanMessage || 'hola', jid);
+        }
+      } catch (error) {
+        logger.error('Error processing message:', error);
+      }
+    }
+  });
+
+  startCronJobs();
+  logger.info('Bot running. Listening for messages...');
 }
 
 main().catch((error) => {
-        logger.error('Fatal error:', error);
-        process.exit(1);
+  logger.error('Fatal error:', error);
+  process.exit(1);
 });
