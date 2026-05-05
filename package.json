@@ -1,0 +1,40 @@
+{
+  "name": "endorinos-agent",
+  "version": "1.0.0",
+  "description": "WhatsApp agent for Endorinos team",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pino": "^7.0.4",
+    "@types/qrcode": "^1.5.6",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
+    "@hapi/boom": "^10.0.1",
+    "baileys": "^7.0.0-rc.9",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.2",
+    "node-cron": "^4.2.1",
+    "pino": "^10.3.1",
+    "postgres": "^3.4.9",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^4.4.2"
+  }
+}
