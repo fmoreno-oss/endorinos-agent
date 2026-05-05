@@ -77,7 +77,7 @@ async function main() {
       try {
         await sendTextMessage(
           env.WHATSAPP_WARROOM_JID!,
-          'Reportándome. Soy Benito, ya estoy aquí en el warroom. Menciónenme cuando me necesiten.'
+          'Reportándome. Soy Benito, ya estoy aquí en el warroom. Mencíonenme cuando me necesiten.'
         );
       } catch (err) {
         logger.error('Failed to send warroom intro message', err);
