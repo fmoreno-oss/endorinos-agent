@@ -55,7 +55,7 @@ async function main() {
       try {
         await sendTextMessage(
           env.WHATSAPP_WARROOM_JID!,
-          'Reportándome en el warroom. Soy Benito. Menciónenme cuando me necesiten.'
+          'Reportándome en el warroom. Soy Benito, el asistente virtual de Ēndor. Menciónenme cuando me necesiten.'
         );
       } catch (err) {
         logger.error('Failed to send warroom intro message', err);
@@ -71,6 +71,11 @@ async function main() {
 
         const jid = msg.key.remoteJid;
         if (!jid) continue;
+
+        // LOG ALL INCOMING JIDS (temporal - para detectar warroom JID)
+        if (jid.endsWith('@g.us') && jid !== env.WHATSAPP_GROUP_JID) {
+          logger.info(`[JID-DISCOVERY] Grupo desconocido detectado: ${jid}`);
+        }
 
         // Accept messages from endorinos group or warroom group
         const allowedGroups = [env.WHATSAPP_GROUP_JID];
