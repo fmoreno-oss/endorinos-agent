@@ -1,4 +1,5 @@
 import { env } from './config/env.js';
+// v2
 import { logger } from './lib/logger.js';
 import { connectWhatsApp, onMessage, getSocket } from './whatsapp/client.js';
 import { upsertMember, updateActivity } from './services/members.js';
