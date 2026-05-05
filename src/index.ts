@@ -8,7 +8,7 @@ import { handleMention } from './services/mention.js';
 import { generateGreeting } from './services/claude.js';
 import { startCronJobs } from './cron/jobs.js';
 import { COMMAND_PREFIX } from './config/constants.js';
-import { sendTextMessage, sendVoiceNote } from './whatsapp/sender.js';
+import { sendTextMessage } from './whatsapp/sender.js';
 import type { proto } from 'baileys';
 
 function getTextContent(msg: proto.IWebMessageInfo): string | null {
@@ -39,7 +39,7 @@ async function main() {
                 try {
                                 await sendTextMessage(
                                                     env.WHATSAPP_GROUP_JID,
-                                                    'QuÃÂ© onda equipo. Soy Benito, su agente de IA. AquÃÂ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃÂ­banme directamente. Con gusto.'
+                                                    'QuÃÂÃÂ© onda equipo. Soy Benito, su agente de IA. AquÃÂÃÂ­ para apoyarles cuando me necesiten: mencionen mi nombre o escrÃÂÃÂ­banme directamente. Con gusto.'
                                                 );
                 } catch (err) {
                                 logger.error('Failed to send intro message', err);
@@ -51,7 +51,7 @@ async function main() {
     try {
       await sendTextMessage(
         env.WHATSAPP_GROUP_JID,
-        'La ciudad nunca duerme, y nosotros tampoco... pero aquÃ­ estamos, pa los que sÃ­ duermen en el grupo ð'
+        'La ciudad nunca duerme, y nosotros tampoco... pero aquÃÂ­ estamos, pa los que sÃÂ­ duermen en el grupo Ã°ÂÂÂ'
       );
     } catch (err) {
       logger.error('Failed to send vibe message', err);
@@ -62,7 +62,7 @@ async function main() {
   setTimeout(async () => {
     try {
       const motivacion = await generateGreeting();
-      await sendVoiceNote(env.WHATSAPP_GROUP_JID, motivacion);
+      await sendTextMessage(env.WHATSAPP_GROUP_JID, motivacion);
     } catch (err) {
       logger.error('Failed to send motivational voice note', err);
     }
