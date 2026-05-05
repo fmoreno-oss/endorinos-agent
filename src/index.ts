@@ -40,11 +40,14 @@ async function main() {
 
       // Descubrir JID de todos los grupos donde esta Benito
       try {
-        const groups = await sock.groupFetchAllParticipating();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const groups = await (sock as any).groupFetchAllParticipating();
         const groupList = Object.entries(groups);
         logger.info('[JID-DISCOVERY] Total grupos: ' + groupList.length);
         for (const [jid, meta] of groupList) {
-          logger.info('[JID-DISCOVERY] Grupo: ' + JSON.stringify(meta.subject) + ' | JID: ' + jid);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const subject = (meta as any).subject || 'sin-nombre';
+          logger.info('[JID-DISCOVERY] Grupo: ' + JSON.stringify(subject) + ' | JID: ' + jid);
         }
       } catch (err) {
         logger.error('[JID-DISCOVERY] Error: ' + err);
@@ -55,8 +58,7 @@ async function main() {
         try {
           await sendTextMessage(
             env.WHATSAPP_GROUP_JID,
-            'Hola equipo. Soy Benito, el asistente de \u00c9ndor. ' +
-            'Ya estoy conectado y listo para ayudar.',
+            'Hola equipo. Soy Benito, el asistente de \u00c9ndor. Ya estoy conectado y listo para ayudar.',
           );
           logger.info('Presentacion enviada al grupo endorinos');
         } catch (err) {
