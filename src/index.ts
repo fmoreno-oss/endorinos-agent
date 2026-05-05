@@ -36,45 +36,45 @@ async function main() {
     const { connection } = update;
 
     if (connection === 'open') {
-      logger.info('WhatsApp conectado. Escaneando grupos...');
+      logger.info('WhatsApp conectado. Listando grupos...');
 
-      // Descubrir todos los grupos en los que esta Benito
+      // Descubrir JID de todos los grupos donde esta Benito
       try {
         const groups = await sock.groupFetchAllParticipating();
         const groupList = Object.entries(groups);
-        logger.info('[JID-DISCOVERY] Total grupos encontrados: ' + groupList.length);
+        logger.info('[JID-DISCOVERY] Total grupos: ' + groupList.length);
         for (const [jid, meta] of groupList) {
-          logger.info('[JID-DISCOVERY] Grupo: "' + meta.subject + '" | JID: ' + jid);
+          logger.info('[JID-DISCOVERY] Grupo: ' + JSON.stringify(meta.subject) + ' | JID: ' + jid);
         }
       } catch (err) {
-        logger.error('[JID-DISCOVERY] Error al obtener grupos: ' + err);
+        logger.error('[JID-DISCOVERY] Error: ' + err);
       }
 
       // Presentacion en grupo endorinos
       setTimeout(async () => {
         try {
-          const introMsg =
+          await sendTextMessage(
+            env.WHATSAPP_GROUP_JID,
             'Hola equipo. Soy Benito, el asistente de \u00c9ndor. ' +
-            'Ya estoy conectado y listo para ayudar. ' +
-            'Puedo responder menciones, registrar actividad y en breve tendr\u00e9 m\u00e1s automatizaciones disponibles.';
-          await sendTextMessage(env.WHATSAPP_GROUP_JID, introMsg);
+            'Ya estoy conectado y listo para ayudar.',
+          );
           logger.info('Presentacion enviada al grupo endorinos');
         } catch (err) {
-          logger.error('Error en presentacion endorinos: ' + err);
+          logger.error('Error presentacion endorinos: ' + err);
         }
       }, 5000);
 
-      // Presentacion en warroom (si el JID esta configurado)
+      // Presentacion en warroom
       if (env.WHATSAPP_WARROOM_JID) {
         setTimeout(async () => {
           try {
-            const warroomMsg =
-              'Hola. Soy Benito, el asistente de \u00c9ndor. ' +
-              'Ya estoy de vuelta en el grupo. Listo para apoyar.';
-            await sendTextMessage(env.WHATSAPP_WARROOM_JID!, warroomMsg);
+            await sendTextMessage(
+              env.WHATSAPP_WARROOM_JID!,
+              'Hola. Soy Benito, el asistente de \u00c9ndor. De vuelta en el grupo. Listo para apoyar.',
+            );
             logger.info('Presentacion enviada al warroom');
           } catch (err) {
-            logger.error('Error en presentacion warroom: ' + err);
+            logger.error('Error presentacion warroom: ' + err);
           }
         }, 6000);
       }
@@ -83,52 +83,68 @@ async function main() {
     }
   });
 
-  onMessage(async (msg) => {
-    if (!msg.key.remoteJid) return;
-
-    const jid = msg.key.remoteJid;
-    const isGroup = jid.endsWith('@g.us');
-    const isFromMe = msg.key.fromMe;
-
-    // Solo procesar mensajes de grupo (no los propios)
-    if (!isGroup || isFromMe) return;
-
-    const sender = msg.key.participant || '';
-    const text = getTextContent(msg);
-    const fullText = getTextContentFull(msg);
-
-    // Guardar miembro y actividad
-    try {
-      await upsertMember(sender, jid);
-      await updateActivity(sender);
-    } catch (err) {
-      logger.error('Error upsertMember/updateActivity: ' + err);
-    }
-
-    // Guardar mensaje
-    try {
-      await saveMessage(sender, fullText);
-    } catch (err) {
-      logger.error('Error saveMessage: ' + err);
-    }
-
-    if (!text) return;
-
-    // Manejar comandos
-    if (text.startsWith(COMMAND_PREFIX)) {
+  onMessage(async ({ messages: msgs }) => {
+    for (const raw of msgs) {
       try {
-        await handleCommand(sock, msg, text);
-      } catch (err) {
-        logger.error('Error handleCommand: ' + err);
-      }
-      return;
-    }
+        const msg = raw as proto.IWebMessageInfo;
+        if (!msg.key || !msg.message) continue;
 
-    // Manejar menciones a Benito
-    try {
-      await handleMention(sock, msg, text);
-    } catch (err) {
-      logger.error('Error handleMention: ' + err);
+        const jid = msg.key.remoteJid;
+        if (!jid) continue;
+
+        // LOG ALL INCOMING JIDS para detectar warroom JID
+        if (jid.endsWith('@g.us') && jid !== env.WHATSAPP_GROUP_JID) {
+          logger.info('[JID-DISCOVERY] Grupo desconocido detectado: ' + jid);
+        }
+
+        // Accept messages from endorinos group or warroom group
+        const allowedGroups = [env.WHATSAPP_GROUP_JID];
+        if (env.WHATSAPP_WARROOM_JID) allowedGroups.push(env.WHATSAPP_WARROOM_JID);
+        if (!allowedGroups.includes(jid)) continue;
+
+        const isFromMe = msg.key.fromMe;
+        if (isFromMe) continue;
+
+        const sender = msg.key.participant || '';
+        const text = getTextContent(msg);
+        const fullText = getTextContentFull(msg);
+
+        // Guardar miembro y actividad
+        try {
+          await upsertMember(sender, jid);
+          await updateActivity(sender);
+        } catch (err) {
+          logger.error('Error upsertMember/updateActivity: ' + err);
+        }
+
+        // Guardar mensaje
+        try {
+          await saveMessage(sender, fullText);
+        } catch (err) {
+          logger.error('Error saveMessage: ' + err);
+        }
+
+        if (!text) continue;
+
+        // Manejar comandos
+        if (text.startsWith(COMMAND_PREFIX)) {
+          try {
+            await handleCommand(sock, msg, text);
+          } catch (err) {
+            logger.error('Error handleCommand: ' + err);
+          }
+          continue;
+        }
+
+        // Manejar menciones a Benito
+        try {
+          await handleMention(sock, msg, text);
+        } catch (err) {
+          logger.error('Error handleMention: ' + err);
+        }
+      } catch (err) {
+        logger.error('Error procesando mensaje: ' + err);
+      }
     }
   });
 }
