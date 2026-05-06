@@ -1,4 +1,4 @@
-────────────────────────────────────────────ááú→→→────────────────────────────────────────────────────────────íimport { env } from './config/env.js';
+import { env } from './config/env.js';
 // v3
 import { logger } from './lib/logger.js';
 import { connectWhatsApp, onMessage, getSocket } from './whatsapp/client.js';
