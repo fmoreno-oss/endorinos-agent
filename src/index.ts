@@ -1,5 +1,5 @@
 import { env } from './config/env.js';
-// v5 - STRICT @mention only - diagnóstico completo
+// v6 - LOG RAW completo para diagnosticar
 import { logger } from './lib/logger.js';
 import { connectWhatsApp, onMessage, getSocket } from './whatsapp/client.js';
 import { upsertMember, updateActivity } from './services/members.js';
@@ -23,10 +23,10 @@ function getMessageType(msg: proto.IWebMessageInfo): string {
 }
 
 async function main() {
-        logger.info('[v5] Starting Endorinos WhatsApp Agent - STRICT @mention mode...');
+        logger.info('[v6] Starting Endorinos WhatsApp Agent...');
 
     await connectWhatsApp();
-        logger.info('WhatsApp connection established');
+        logger.info('[v6] WhatsApp connection established');
 
     startCronJobs();
 
@@ -36,6 +36,18 @@ async function main() {
                       for (const msg of messages as proto.IWebMessageInfo[]) {
                                       try {
                                                           const jid = msg.key.remoteJid ?? '';
+                                                          const content = getTextContent(msg);
+                                                          const msgType = getMessageType(msg);
+
+                                          // LOG COMPLETO para cada mensaje recibido
+                                          const rawId = getSocket().user?.id ?? '';
+                                                          const botNumber = rawId.split('@')[0].split(':')[0];
+                                                          const mentionedJids: string[] = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [];
+                                                          const botJid = botNumber ? `${botNumber}@s.whatsapp.net` : '';
+
+                                          logger.warn(`[MSG-RAW] jid=${jid} type=${msgType} content="${content}" fromMe=${msg.key.fromMe}`);
+                                                          logger.warn(`[MSG-RAW] rawId=${rawId} botNumber=${botNumber} botJid=${botJid}`);
+                                                          logger.warn(`[MSG-RAW] mentionedJids=${JSON.stringify(mentionedJids)}`);
 
                                           // Solo mensajes de grupo
                                           if (!jid.endsWith('@g.us')) continue;
@@ -56,8 +68,6 @@ async function main() {
                                                           if (!senderJid) continue;
 
                                           const senderName = msg.pushName || 'Desconocido';
-                                                          const content = getTextContent(msg);
-                                                          const msgType = getMessageType(msg);
 
                                           // Guardar en base de datos
                                           const memberId = await upsertMember(senderJid, senderName);
@@ -78,38 +88,25 @@ async function main() {
                                                                   continue;
                                           }
 
-                                          // === GATE ESTRICTO: solo responder con @mention formal de WhatsApp ===
+                                          // === GATE ESTRICTO ===
+                                          // SOLO responder si hay @mention formal en mentionedJids
+                                          // Si botNumber vacío o botJid no en mentionedJids -> SILENCIO TOTAL
 
-                                          // Obtener número del bot
-                                          const rawId = getSocket().user?.id ?? '';
-                                                          // rawId puede ser "521234567890:15@s.whatsapp.net" o "521234567890@s.whatsapp.net"
-                                          const botNumber = rawId.split('@')[0].split(':')[0];
-
-                                          logger.info(`[MENTION-GATE] rawId=${rawId} botNumber=${botNumber} msgType=${msgType} content="${content}"`);
-
-                                          // Si no tenemos número del bot, no podemos verificar — silencio total
                                           if (!botNumber) {
-                                                                  logger.warn('[MENTION-GATE] botNumber vacío — ignorando mensaje');
+                                                                  logger.warn('[GATE] botNumber vacío — SILENCIO');
                                                                   continue;
                                           }
 
-                                          const botJid = `${botNumber}@s.whatsapp.net`;
-                                                          const mentionedJids: string[] = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid ?? [];
-
-                                          logger.info(`[MENTION-GATE] botJid=${botJid} mentionedJids=${JSON.stringify(mentionedJids)}`);
-
                                           const isMentioned = mentionedJids.includes(botJid);
+                                                          logger.warn(`[GATE] isMentioned=${isMentioned} botJid=${botJid} — ${isMentioned ? 'RESPONDER' : 'SILENCIO'}`);
 
-                                          logger.info(`[MENTION-GATE] isMentioned=${isMentioned} — ${isMentioned ? 'RESPONDIENDO' : 'SILENCIO TOTAL'}`);
-
-                                          // SILENCIO ABSOLUTO si no hay @mention formal
                                           if (!isMentioned) continue;
 
                                           const cleanMessage = content.replace(/@\S+/g, '').trim();
                                                           await handleMention(senderName, cleanMessage || 'hola', jid);
 
                                       } catch (error) {
-                                                          logger.error('Error processing message:', error);
+                                                          logger.error('[ERROR] Error processing message:', error);
                                       }
                       }
     });
