@@ -118,3 +118,12 @@ export async function generateKickoffReminder(): Promise<string> {
           'Genera el recordatorio del kickoff semanal.',
         );
 }
+
+export async function generateWarroomArticleMessage(articleUrl: string, articleTitle: string): Promise<string> {
+        logger.info('Generating warroom article share message...');
+        return ask(
+                    CLAUDE_SMART,
+                    `${BENITO_BASE} Comparte el siguiente artículo del blog de Ēndor en el grupo de War Room de forma natural y entusiasta. El mensaje debe invitar a leerlo, resaltar por qué es relevante para el equipo, y terminar con el link. Máximo 3 líneas.`,
+                    `Artículo: "${articleTitle}"\nURL: ${articleUrl}`,
+                );
+}
