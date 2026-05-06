@@ -13,144 +13,93 @@ import { sendTextMessage } from './whatsapp/sender.js';
 import type { proto } from 'baileys';
 
 function getTextContent(msg: proto.IWebMessageInfo): string | null {
-  const m = msg.message;
-  if (!m) return null;
-  return m.conversation || m.extendedTextMessage?.text || null;
+    const m = msg.message;
+    if (!m) return null;
+    return m.conversation || m.extendedTextMessage?.text || null;
 }
 
 function getMessageType(msg: proto.IWebMessageInfo): string {
-  const m = msg.message;
-  if (!m) return 'unknown';
-  if (m.conversation || m.extendedTextMessage) return 'text';
-  if (m.imageMessage) return 'image';
-  if (m.videoMessage) return 'video';
-  if (m.audioMessage) return 'audio';
-  if (m.documentMessage) return 'document';
-  if (m.stickerMessage) return 'sticker';
-  return 'other';
+    const m = msg.message;
+    if (!m) return 'unknown';
+    return Object.keys(m)[0] ?? 'unknown';
 }
 
 async function main() {
-  const sock = await connectWhatsApp();
+    logger.info('Starting Endorinos WhatsApp Agent...');
 
-  sock.ev.on('connection.update', async (update) => {
-    const { connection } = update;
+  await connectWhatsApp();
+    logger.info('WhatsApp connection established');
 
-    if (connection === 'open') {
-      logger.info('WhatsApp conectado. Listando grupos...');
+  startCronJobs();
 
-      // Descubrir JID de todos los grupos donde esta Benito
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const groups = await (sock as any).groupFetchAllParticipating();
-        const groupList = Object.entries(groups);
-        logger.info('[JID-DISCOVERY] Total grupos: ' + groupList.length);
-        for (const [gJid, meta] of groupList) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const subject = (meta as any).subject || 'sin-nombre';
-          logger.info('[JID-DISCOVERY] Grupo: ' + JSON.stringify(subject) + ' | JID: ' + gJid);
-        }
-      } catch (err) {
-        logger.error('[JID-DISCOVERY] Error: ' + err);
-      }
+  onMessage(async ({ messages, type }) => {
+        if (type !== 'notify') return;
 
-      // Presentacion en grupo endorinos
-      setTimeout(async () => {
-        try {
-          await sendTextMessage(
-            env.WHATSAPP_GROUP_JID,
-            'Hola equipo. Soy Benito, el asistente de \u00c9ndor. Ya estoy conectado y listo para ayudar.',
-          );
-          logger.info('Presentacion enviada al grupo endorinos');
-        } catch (err) {
-          logger.error('Error presentacion endorinos: ' + err);
-        }
-      }, 5000);
+                for (const msg of messages as proto.IWebMessageInfo[]) {
+                        try {
+                                  const jid = msg.key.remoteJid ?? '';
 
-      // Presentacion en warroom (si el JID esta configurado)
-      if (env.WHATSAPP_WARROOM_JID) {
-        setTimeout(async () => {
-          try {
-            await sendTextMessage(
-              env.WHATSAPP_WARROOM_JID!,
-              'Soy Benito, el asistente de \u00c9ndor. Puedo resumir la conversaci\u00f3n del grupo, dar avisos al equipo o resolver dudas espec\u00edficas. Esc\u00edbeme directamente.',
-            );
-            logger.info('Presentacion enviada al warroom');
-          } catch (err) {
-            logger.error('Error presentacion warroom: ' + err);
-          }
-        }, 6000);
-      }
+                          // Only process group messages
+                          if (!jid.endsWith('@g.us')) continue;
 
-      startCronJobs();
-    }
-  });
+                          // Skip if no group JID
+                          if (!jid) continue;
 
-  onMessage(async ({ messages: msgs }) => {
-    for (const raw of msgs) {
-      try {
-        const msg = raw as proto.IWebMessageInfo;
-        if (!msg.key || !msg.message) continue;
+                          // Log group discovery
+                          if (!env.WHATSAPP_GROUP_JID) {
+                                      logger.info(`[JID DISCOVERY] Grupo desconocido detectado: ${jid}`);
+                          }
 
-        const jid = msg.key.remoteJid;
-        if (!jid) continue;
+                          // Accept messages from endorinos group or warroom group
+                          const allowedGroups = [env.WHATSAPP_GROUP_JID];
+                                  if (env.WHATSAPP_WARROOM_JID) allowedGroups.push(env.WHATSAPP_WARROOM_JID);
+                                  if (!allowedGroups.includes(jid)) continue;
 
-        // LOG ALL INCOMING JIDS para detectar warroom JID
-        if (jid.endsWith('@g.us') && jid !== env.WHATSAPP_GROUP_JID) {
-          logger.info('[JID-DISCOVERY] Grupo desconocido detectado: ' + jid);
-        }
+                          if (msg.key.fromMe) continue;
 
-        // Accept messages from endorinos group or warroom group
-        const allowedGroups = [env.WHATSAPP_GROUP_JID];
-        if (env.WHATSAPP_WARROOM_JID) allowedGroups.push(env.WHATSAPP_WARROOM_JID);
-        if (!allowedGroups.includes(jid)) continue;
+                          const senderJid = msg.key.participant || '';
+                                  if (!senderJid) continue;
 
-        if (msg.key.fromMe) continue;
+                          const senderName = msg.pushName || 'Desconocido';
+                                  const content = getTextContent(msg);
+                                  const type = getMessageType(msg);
 
-        const senderJid = msg.key.participant || '';
-        if (!senderJid) continue;
+                          // Save to database
+                          const memberId = await upsertMember(senderJid, senderName);
+                                  await updateActivity(senderJid);
+                                  await saveMessage({
+                                              memberId,
+                                              whatsappMessageId: msg.key.id || '',
+                                              content,
+                                              messageType: type,
+                                              sentAt: new Date((msg.messageTimestamp as number) * 1000),
+                                  });
 
-        const senderName = msg.pushName || 'Desconocido';
-        const content = getTextContent(msg);
-        const type = getMessageType(msg);
+                          if (!content) continue;
 
-        // Save to database
-        const memberId = await upsertMember(senderJid, senderName);
-        await updateActivity(senderJid);
-        await saveMessage({
-          memberId,
-          whatsappMessageId: msg.key.id || '',
-          content: content || '',
-          messageType: type,
-          sentAt: new Date((msg.messageTimestamp as number) * 1000),
-        });
+                          // Commands: !resumen, !actividad
+                          if (content.startsWith(COMMAND_PREFIX)) {
+                                      await handleCommand(content, jid);
+                                      continue;
+                          }
 
-        if (!content) continue;
+                          // Respond ONLY when mentioned with @Benito (formal WhatsApp mention)
+                          const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
+                                  const botNumber = getSocket().user?.id?.split(':')[0] || '';
+                                  const isMentionedByJid = mentionedJids.length > 0 && mentionedJids.some((m) => m.startsWith(botNumber));
 
-        // Commands: !resumen, !actividad
-        if (content.startsWith(COMMAND_PREFIX)) {
-          await handleCommand(content, jid);
-          continue;
-        }
-
-        // Respond when mentioned (@Benito or 'benito' in text)
-        const mentionedJids = msg.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
-        const botNumber = getSocket().user?.id?.split(':')[0] || '';
-        const isMentionedByJid = mentionedJids.length > 0;
-        const isMentionedByName = content.toLowerCase().includes('benito');
-
-        if (isMentionedByJid || isMentionedByName) {
-          const cleanMessage = content.replace(/@\S+/g, '').replace(/benito/gi, '').trim();
-          await handleMention(senderName, cleanMessage || 'hola', jid);
-        }
-      } catch (error) {
-        logger.error('Error processing message:', error);
-      }
-    }
+                          if (isMentionedByJid) {
+                                      const cleanMessage = content.replace(/@\S+/g, '').trim();
+                                      await handleMention(senderName, cleanMessage || 'hola', jid);
+                          }
+                        } catch (error) {
+                                  logger.error('Error processing message:', error);
+                        }
+                }
   });
 }
 
 main().catch((err) => {
-  logger.error('Fatal error en main: ' + err);
-  process.exit(1);
+    logger.error('Fatal error:', err);
+    process.exit(1);
 });
